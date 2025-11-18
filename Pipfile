@@ -9,6 +9,7 @@ uvicorn = {extras = ["standard"], version = "*"}
 pillow = "*"
 numpy = "*"
 scikit-learn = "*"
+python-multipart = "*"
 
 [dev-packages]
 httpx = "*"

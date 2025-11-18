@@ -1,9 +1,87 @@
-from fastapi import APIRouter
+from __future__ import annotations
+
+import base64
+from io import BytesIO
+from pathlib import Path
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+
+from app.core.config import settings
+from app.services.image_pipeline.pipeline import render_paint_by_numbers
+from app.services.image_pipeline.palette import build_palette_metadata, render_palette_pdf
 
 
 router = APIRouter(prefix="/generate", tags=["generate"])
 
+ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg"}
 
-@router.get("/", summary="Placeholder generate endpoint")
-async def placeholder_generate() -> dict[str, str]:
-    return {"detail": "Not implemented yet"}
+
+def _sanitize_filename(filename: str | None) -> str:
+    stem = Path(filename or "output").stem
+    if not stem:
+        stem = "output"
+    return f"{stem}_paint_by_numbers.png"
+
+
+MAX_FILE_BYTES = settings.max_upload_bytes
+MIN_COLORS = settings.min_colors
+MAX_COLORS = settings.max_colors
+MIN_WIDTH = settings.min_width
+MAX_WIDTH = settings.max_width
+
+
+@router.post("/", summary="Generate a paint-by-numbers PNG with palette legend")
+async def generate_image(
+    file: UploadFile = File(...),
+    num_colors: int = Form(settings.default_num_colors),
+    max_width: int = Form(settings.default_max_width),
+):
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
+    if num_colors < MIN_COLORS or num_colors > MAX_COLORS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"num_colors must be between {MIN_COLORS} and {MAX_COLORS}",
+        )
+    if max_width < MIN_WIDTH or max_width > MAX_WIDTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"max_width must be between {MIN_WIDTH} and {MAX_WIDTH}",
+        )
+
+    contents = await file.read(MAX_FILE_BYTES + 1)
+    if len(contents) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File is empty")
+    if len(contents) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+
+    final_image, palette, _ = render_paint_by_numbers(
+        BytesIO(contents),
+        num_colors=num_colors,
+        max_width=max_width,
+        min_region_size=settings.min_region_size,
+    )
+    palette_metadata = build_palette_metadata(palette)
+
+    png_buffer = BytesIO()
+    final_image.save(png_buffer, format="PNG")
+    png_b64 = base64.b64encode(png_buffer.getvalue()).decode("ascii")
+
+    legend_pdf_bytes = render_palette_pdf(palette_metadata)
+    legend_b64 = base64.b64encode(legend_pdf_bytes).decode("ascii")
+
+    return {
+        "image": {
+            "filename": _sanitize_filename(file.filename),
+            "content_type": "image/png",
+            "width": final_image.width,
+            "height": final_image.height,
+            "data": png_b64,
+        },
+        "palette": palette_metadata,
+        "legend": {
+            "filename": f"{Path(file.filename or 'output').stem}_palette_legend.pdf",
+            "content_type": "application/pdf",
+            "data": legend_b64,
+        },
+    }

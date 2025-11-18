@@ -63,11 +63,14 @@ paint-by-number-engine/
   - `file` (required) – PNG/JPEG upload
   - `num_colors` (optional, int; default 10; allowed 3–30)
   - `max_width` (optional, int; default 1200; allowed 400–4000)
-- **Response**: `200 OK` with PNG body containing outlines + numbered regions
+- **Response**: `200 OK` with:
+  - PNG body containing outlines + numbered regions sized for Letter paper
+  - JSON payload describing `palette` metadata so the UI can show which RGB/HEX color corresponds to each number
+  - A generated legend PDF (Letter size) with one row per color: number, RGB, HEX, optional color name swatch
 - **Errors**:
   - `400 Bad Request` for validation issues (missing file, invalid ranges, MIME issues)
   - `500` for unexpected errors (log everything)
-- **Future extensions**: JSON metadata (palette, URLs), SVG/PDF outputs
+- **Future extensions**: server-rendered palette legend sheets (PNG/PDF), SVG outputs
 
 ## 7. Processing Pipeline
 1. **Load & Normalize (`io.py`)**
@@ -77,10 +80,17 @@ paint-by-number-engine/
    - Returns `label_img` (H×W ints) and `palette` (`k × 3` colors)
 3. **Outline Generation (`outline.py`)**
    - Compare each pixel with 4-neighbors, mark borders black on white canvas
-4. **Number Placement (`numbering.py`)**
-   - Per cluster: compute centroid, draw small white box + black text (`cluster_id + 1`)
+4. **Region Labeling & Number Placement (`regions.py`, `numbering.py`)**
+   - Identify connected components within each color label (flood fill or BFS)
+   - Merge components smaller than `min_region_size` into adjacent regions (similar to the approach in [daniel-munro/pbnify](https://github.com/daniel-munro/pbnify) where tiny blobs are reassigned)
+   - For each remaining region, choose a labeling point that is deep inside the region (e.g., maximize run-length product in four directions, as pbnify does) and draw the corresponding number with a contrast outline
 5. **Response Assembly**
-   - Convert to a PNG sized to fit within an 8.5" × 11" canvas (maintain aspect ratio, optional padding) and stream via FastAPI `StreamingResponse`
+   - Convert to a PNG sized to fit within an 8.5" × 11" canvas (maintain aspect ratio, optional padding)
+   - Produce palette metadata (color ID → RGB/HEX + label) so the client can render a legend
+   - Render a simple legend PDF (Letter size) listing each color ID + RGB + HEX swatch
+   - (Optional) Generate a “painted preview” PNG by filling each region with its palette color and optionally overlaying faint outlines/numbers so users can visualize the finished piece
+   - (Optional future enhancement) Apply additional smoothing passes before outlining to further mimic pbnify’s aesthetic
+   - Stream PNG + palette JSON + legend PDF (e.g., multipart response or JSON containing base64 data/URLs)
 
 ## 8. Configuration
 Centralize in `app/core/config.py` (simple dataclass or `pydantic-settings`).
@@ -115,7 +125,8 @@ Defaults live in code with `.env` overrides per environment.
 - **Scalability**: Stateless HTTP service; horizontal scaling later; background jobs optional
 
 ## 12. Future Enhancements
-- Better region logic (connected components, merge tiny specks)
-- Additional outputs (SVG, PDF, palette JSON/legend)
+- Refine region logic further (e.g., neighborhood smoothing like pbnify’s `smooth()` step, adaptive thresholds, auto font scaling)
+- Generate additional previews (fully painted mockups, monochrome shading guides) to help users compare outputs before printing
+- Additional outputs (SVG, multi-page PDFs, enhanced palette legend with paint-mixing tips)
 - Storage integration (R2, Supabase) with signed URLs
 - Auth/rate limiting, usage history, and themed style presets

@@ -75,7 +75,29 @@ Each PR builds toward the paint-by-number engine MVP without overwhelming review
   - Running the server and POSTing an image returns 200 with outlines + numbers
   - Output PNG fits within a Letter-sized canvas (≈2550×3300 px) so it prints on 8.5" × 11" paper without scaling surprises
 
-## PR 8 — Validation + Error Handling
+## PR 8 — Palette Metadata & Legend
+- **Title**: `feat: return palette metadata and legend PDF with generate responses`
+- **Scope**:
+  - Collect palette information from quantization (number, RGB, HEX)
+  - Include palette metadata in the `/generate` JSON response so the UI can render a legend inline
+  - Render a minimal server-generated legend PDF (Letter size) listing each color number, RGB/HEX values, and a swatch; include the PDF in the response (base64 or multipart)
+  - Add tests ensuring palette payload aligns with numbering and that the PDF creation hooks are exercised
+- **Acceptance**:
+  - Each response documents every color ID + RGB/HEX pair
+  - Clients can show a legend immediately and users can download/print the PDF without extra work
+
+## PR 9 — Region-Aware Number Placement
+- **Title**: `feat: adopt region-based numbering inspired by pbnify`
+- **Scope**:
+  - Implement connected-component detection on label maps (BFS/flood fill)
+  - Merge regions below a configurable pixel threshold into their neighbors (similar to pbnify’s region merging)
+  - For each remaining region, compute an interior point using a heuristic like pbnify’s run-length product (`getLabelLoc`) and render the number directly at that spot (no big circles)
+  - Optionally add a smoothing pass before outlining to help region detection
+- **Acceptance**:
+  - Each distinct region gets a number placed inside its boundaries
+  - Numbers are legible and no longer float outside the shapes they refer to
+
+## PR 10 — Validation + Error Handling
 - **Title**: `feat: add request validation and error handling for /generate`
 - **Scope**:
   - Enforce `num_colors` (3–30) and `max_width` (400–4000)
@@ -86,7 +108,7 @@ Each PR builds toward the paint-by-number engine MVP without overwhelming review
   - Invalid requests yield 400s with descriptive detail
   - Tests cover missing file, bad ranges, MIME issues
 
-## PR 9 — Config + Environment Management
+## PR 11 — Config + Environment Management
 - **Title**: `chore: centralize settings with config module`
 - **Scope**:
   - Implement `app/core/config.py` (dataclass or `pydantic-settings`)
@@ -97,7 +119,7 @@ Each PR builds toward the paint-by-number engine MVP without overwhelming review
   - Changing `.env` updates runtime defaults
   - Tests still pass
 
-## PR 10 — Testing + Linting Tooling
+## PR 12 — Testing + Linting Tooling
 - **Title**: `chore: add pytest and linting to project`
 - **Scope**:
   - Ensure Pipenv installs pytest plus lint tools (ruff/flake8, black)
@@ -107,6 +129,16 @@ Each PR builds toward the paint-by-number engine MVP without overwhelming review
 - **Acceptance**:
   - `pipenv run pytest` and lint commands succeed locally/CI
   - CI runs automatically on PRs
+
+## PR 13 — Painted Preview Output
+- **Title**: `feat: generate filled-in paint preview alongside line art`
+- **Scope**:
+  - After quantization + region smoothing, render a second PNG where each region is filled with its palette color (optionally overlay faint outlines/numbers)
+  - Include this preview in the `/generate` response (e.g., additional base64 blob) and expose it via the sample output script so users can visualize the finished painting before printing
+  - Add a regression test ensuring the preview uses the same palette mapping as the legend
+- **Acceptance**:
+  - Responses include both the line-art sheet and a colored preview
+  - Palette colors and numbers line up between preview, sheet, and legend
 
 ## Future PR Ideas
 - SVG/PDF export formats
