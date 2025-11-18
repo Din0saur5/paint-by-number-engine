@@ -36,6 +36,9 @@ def test_generate_endpoint_returns_assets():
     assert payload["image"]["content_type"] == "image/png"
     png_data = base64.b64decode(payload["image"]["data"])
     assert png_data.startswith(b"\x89PNG")
+    assert payload["preview"]["content_type"] == "image/png"
+    preview_data = base64.b64decode(payload["preview"]["data"])
+    assert preview_data.startswith(b"\x89PNG")
     assert payload["legend"]["content_type"] == "application/pdf"
     pdf_data = base64.b64decode(payload["legend"]["data"])
     assert pdf_data.startswith(b"%PDF")

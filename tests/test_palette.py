@@ -1,6 +1,10 @@
 import numpy as np
 
-from app.services.image_pipeline.palette import build_palette_metadata, render_palette_pdf
+from app.services.image_pipeline.palette import (
+    build_palette_metadata,
+    render_palette_pdf,
+    render_painted_preview,
+)
 
 
 def test_build_palette_metadata_generates_hex():
@@ -25,3 +29,19 @@ def test_render_palette_pdf_returns_pdf_bytes():
     assert pdf_bytes.startswith(b"%PDF")
     # sanity check: not empty
     assert len(pdf_bytes) > 1000
+
+
+def test_render_painted_preview_matches_palette():
+    labels = np.array(
+        [
+            [0, 1],
+            [1, 0],
+        ]
+    )
+    palette = np.array([[255, 0, 0], [0, 0, 255]], dtype=np.uint8)
+
+    preview = render_painted_preview(labels, palette)
+    pixels = np.array(preview)
+
+    assert tuple(pixels[0, 0]) == (255, 0, 0)
+    assert tuple(pixels[0, 1]) == (0, 0, 255)

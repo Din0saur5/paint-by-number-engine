@@ -30,7 +30,9 @@ def build_palette_metadata(palette: np.ndarray) -> list[dict[str, object]]:
     return metadata
 
 
-def render_palette_pdf(metadata: list[dict[str, object]], width: int = 2550, height: int = 3300) -> bytes:
+def render_palette_pdf(
+    metadata: list[dict[str, object]], width: int = 2550, height: int = 3300
+) -> bytes:
     """Create a simple legend PDF listing colors, numbers, and hex codes."""
 
     image = Image.new("RGB", (width, height), "white")
@@ -74,3 +76,17 @@ def render_palette_pdf(metadata: list[dict[str, object]], width: int = 2550, hei
     buffer = BytesIO()
     image.save(buffer, format="PDF")
     return buffer.getvalue()
+
+
+def render_painted_preview(label_img, palette: np.ndarray) -> Image.Image:
+    labels = np.asarray(label_img)
+    height, width = labels.shape
+    preview = Image.new("RGB", (width, height), "white")
+    pixels = preview.load()
+
+    for y in range(height):
+        for x in range(width):
+            color = tuple(int(c) for c in palette[labels[y, x]])
+            pixels[x, y] = color
+
+    return preview

@@ -6,10 +6,12 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from app.services.image_pipeline.fonts import load_font
-from app.services.image_pipeline.regions import Region, find_regions, region_label_position
+from app.services.image_pipeline.regions import find_regions, region_label_position
 
 
-def add_numbers(outline_img: Image.Image, label_img, palette, min_region_size: int = 0) -> Image.Image:
+def add_numbers(
+    outline_img: Image.Image, label_img, palette, min_region_size: int = 0
+) -> Image.Image:
     """Draw numbers inside each region, not just per color cluster."""
 
     labels = np.asarray(label_img)
@@ -35,7 +37,6 @@ def add_numbers(outline_img: Image.Image, label_img, palette, min_region_size: i
             continue
         region_counts.setdefault(region.label, 0)
         region_counts[region.label] += 1
-        region_index = region_counts[region.label]
         text = str(region.label + 1)
 
         y, x = region_label_position(labels, region)

@@ -27,8 +27,6 @@ def quantize_colors(image: Image.Image, num_colors: int) -> tuple[np.ndarray, np
     kmeans.fit(flat_pixels)
 
     labels = kmeans.labels_.reshape(height, width)
-    palette = np.clip(
-        np.rint(kmeans.cluster_centers_), 0, 255
-    ).astype(np.uint8)
+    palette = np.clip(np.rint(kmeans.cluster_centers_), 0, 255).astype(np.uint8)
 
     return labels, palette

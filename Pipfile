@@ -10,10 +10,14 @@ pillow = "*"
 numpy = "*"
 scikit-learn = "*"
 python-multipart = "*"
+pydantic-settings = "*"
+python-dotenv = "*"
 
 [dev-packages]
 httpx = "*"
 pytest = "*"
+ruff = "*"
+black = "*"
 
 [requires]
 python_version = "3.11"

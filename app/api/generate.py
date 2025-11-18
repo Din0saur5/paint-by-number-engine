@@ -55,7 +55,7 @@ async def generate_image(
     if len(contents) > MAX_FILE_BYTES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
 
-    final_image, palette, _ = render_paint_by_numbers(
+    final_image, preview_image, palette, _ = render_paint_by_numbers(
         BytesIO(contents),
         num_colors=num_colors,
         max_width=max_width,
@@ -70,6 +70,10 @@ async def generate_image(
     legend_pdf_bytes = render_palette_pdf(palette_metadata)
     legend_b64 = base64.b64encode(legend_pdf_bytes).decode("ascii")
 
+    preview_buffer = BytesIO()
+    preview_image.save(preview_buffer, format="PNG")
+    preview_b64 = base64.b64encode(preview_buffer.getvalue()).decode("ascii")
+
     return {
         "image": {
             "filename": _sanitize_filename(file.filename),
@@ -77,6 +81,13 @@ async def generate_image(
             "width": final_image.width,
             "height": final_image.height,
             "data": png_b64,
+        },
+        "preview": {
+            "filename": f"{Path(file.filename or 'output').stem}_painted_preview.png",
+            "content_type": "image/png",
+            "width": preview_image.width,
+            "height": preview_image.height,
+            "data": preview_b64,
         },
         "palette": palette_metadata,
         "legend": {

@@ -23,7 +23,7 @@ def main() -> None:
         raise FileNotFoundError(f"Missing {input_path}")
 
     with input_path.open("rb") as infile:
-        image, palette, _ = render_paint_by_numbers(
+        line_image, preview_image, palette, _ = render_paint_by_numbers(
             infile,
             num_colors=settings.default_num_colors,
             max_width=settings.default_max_width,
@@ -31,7 +31,10 @@ def main() -> None:
         )
 
     png_path = output_dir / "test-image-paint-by-number.png"
-    image.save(png_path, format="PNG")
+    line_image.save(png_path, format="PNG")
+
+    preview_path = output_dir / "test-image-painted-preview.png"
+    preview_image.save(preview_path, format="PNG")
 
     metadata = build_palette_metadata(palette)
     legend_pdf = render_palette_pdf(metadata)
@@ -42,6 +45,7 @@ def main() -> None:
     palette_json_path.write_text(json.dumps(metadata, indent=2))
 
     print(f"Wrote {png_path}")
+    print(f"Wrote {preview_path}")
     print(f"Wrote {legend_path}")
     print(f"Wrote {palette_json_path}")
 

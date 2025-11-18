@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import BinaryIO, Tuple
+from typing import BinaryIO
 
 import numpy as np
 from PIL import Image
@@ -10,6 +10,7 @@ from PIL import Image
 from app.services.image_pipeline.io import load_and_resize
 from app.services.image_pipeline.numbering import add_numbers
 from app.services.image_pipeline.outline import make_outline_image
+from app.services.image_pipeline.palette import render_painted_preview
 from app.services.image_pipeline.quantize import quantize_colors
 from app.services.image_pipeline.regions import merge_small_regions
 
@@ -20,7 +21,7 @@ def render_paint_by_numbers(
     num_colors: int,
     max_width: int,
     min_region_size: int = 0,
-) -> tuple[Image.Image, np.ndarray, np.ndarray]:
+) -> tuple[Image.Image, Image.Image, np.ndarray, np.ndarray]:
     """Run the complete pipeline and return the final image plus metadata."""
 
     resized = load_and_resize(image_file, max_width=max_width)
@@ -29,4 +30,5 @@ def render_paint_by_numbers(
         label_img = merge_small_regions(label_img, min_region_size)
     outline_img = make_outline_image(label_img)
     numbered_img = add_numbers(outline_img, label_img, palette, min_region_size)
-    return numbered_img, palette, label_img
+    preview_img = render_painted_preview(label_img, palette)
+    return numbered_img, preview_img, palette, label_img

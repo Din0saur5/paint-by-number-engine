@@ -1,6 +1,10 @@
 import numpy as np
 
-from app.services.image_pipeline.regions import merge_small_regions, find_regions, region_label_position
+from app.services.image_pipeline.regions import (
+    merge_small_regions,
+    find_regions,
+    region_label_position,
+)
 
 
 def test_merge_small_regions_removes_isolated_pixels():
