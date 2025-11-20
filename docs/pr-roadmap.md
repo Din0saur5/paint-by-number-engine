@@ -100,7 +100,7 @@ Each PR builds toward the paint-by-number engine MVP without overwhelming review
 ## PR 10 — Validation + Error Handling
 - **Title**: `feat: add request validation and error handling for /generate`
 - **Scope**:
-  - Enforce `num_colors` (3–30) and `max_width` (400–4000)
+  - Enforce `num_colors` (3–16) and `max_width` (400–4000)
   - Reject non-image MIME types and oversize uploads (when possible)
   - Raise FastAPI `HTTPException` for user errors
   - Extend tests for validation failures

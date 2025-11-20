@@ -22,7 +22,7 @@ Runtime settings come from environment variables (prefixed with `PBN_`) or a loc
 | `PBN_DEFAULT_NUM_COLORS` | `10` | Default number of paint colors |
 | `PBN_DEFAULT_MAX_WIDTH` | `2550` | Default resize width for uploads (px) |
 | `PBN_MIN_REGION_SIZE` | `300` | Minimum pixels per region before merging |
-| `PBN_MIN_COLORS` / `PBN_MAX_COLORS` | `3` / `30` | Allowed range for `num_colors` |
+| `PBN_MIN_COLORS` / `PBN_MAX_COLORS` | `3` / `16` | Allowed range for `num_colors` |
 | `PBN_MIN_WIDTH` / `PBN_MAX_WIDTH` | `400` / `4000` | Allowed range for `max_width` |
 | `PBN_MAX_UPLOAD_BYTES` | `15728640` | Max upload size in bytes (15 MB) |
 

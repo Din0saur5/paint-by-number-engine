@@ -61,7 +61,7 @@ paint-by-number-engine/
 - **Endpoint**: `POST /generate/`
 - **Request**: `multipart/form-data`
   - `file` (required) – PNG/JPEG upload
-  - `num_colors` (optional, int; default 10; allowed 3–30)
+  - `num_colors` (optional, int; default 10; allowed 3–16)
   - `max_width` (optional, int; default 1200; allowed 400–4000)
 - **Response**: `200 OK` with:
   - PNG body containing outlines + numbered regions sized for Letter paper
@@ -97,7 +97,7 @@ Centralize in `app/core/config.py` (simple dataclass or `pydantic-settings`).
 - `DEFAULT_MAX_WIDTH` (≈1200)
 - `DEFAULT_NUM_COLORS` (≈10)
 - `MAX_WIDTH_LIMIT` (≈4000)
-- `MAX_COLORS_LIMIT` (≈30)
+- `MAX_COLORS_LIMIT` (≈16)
 - `MAX_UPLOAD_BYTES` (≈10–15 MB)
 Defaults live in code with `.env` overrides per environment.
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image
 
+OUTLINE_GRAY = 160  # softer line color instead of harsh black
+
 
 def make_outline_image(label_img) -> Image.Image:
     """Return a monochrome outline image from a 2D label array."""
@@ -24,6 +26,6 @@ def make_outline_image(label_img) -> Image.Image:
     borders[:, 1:] |= diff_right
 
     outline = np.full(labels.shape, 255, dtype=np.uint8)
-    outline[borders] = 0
+    outline[borders] = OUTLINE_GRAY
 
     return Image.fromarray(outline, mode="L")

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     min_region_size: int = Field(300, description="Minimum region size before merging")
 
     min_colors: int = Field(3, description="Minimum allowed num_colors value")
-    max_colors: int = Field(30, description="Maximum allowed num_colors value")
+    max_colors: int = Field(16, description="Maximum allowed num_colors value")
 
     min_width: int = Field(400, description="Minimum allowed max_width value")
     max_width: int = Field(4000, description="Maximum allowed max_width value")

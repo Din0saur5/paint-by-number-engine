@@ -8,6 +8,8 @@ from PIL import Image, ImageDraw
 from app.services.image_pipeline.fonts import load_font
 from app.services.image_pipeline.regions import find_regions, region_label_position
 
+NUMBER_GRAY = (160, 160, 160)
+
 
 def add_numbers(
     outline_img: Image.Image, label_img, palette, min_region_size: int = 0
@@ -20,14 +22,15 @@ def add_numbers(
 
     result = outline_img.convert("RGB")
     draw = ImageDraw.Draw(result)
-    font_size = max(24, result.width // 50)
+    base_font_size = result.width // 120
+    font_size = max(12, int(base_font_size * 0.85))
     font = load_font(font_size)
 
     def draw_label(x: int, y: int, text: str) -> None:
         offsets = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
         for dx, dy in offsets:
             draw.text((x + dx, y + dy), text, fill="white", font=font, anchor="mm")
-        draw.text((x, y), text, fill="black", font=font, anchor="mm")
+        draw.text((x, y), text, fill=NUMBER_GRAY, font=font, anchor="mm")
 
     regions = find_regions(labels)
     region_counts: dict[int, int] = {}
