@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply min-h-screen bg-base-100 text-slate-900 font-body;
+    background-image:
+      radial-gradient(120% 60% at 20% 20%, rgba(59, 130, 246, 0.12), transparent),
+      radial-gradient(120% 60% at 80% 0%, rgba(14, 165, 233, 0.14), transparent),
+      radial-gradient(120% 50% at 50% 60%, rgba(15, 23, 42, 0.08), transparent);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display text-slate-900;
+  }
+
+  a {
+    @apply transition-colors duration-150;
+  }
+}
