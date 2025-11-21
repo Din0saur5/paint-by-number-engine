@@ -59,6 +59,7 @@ function App() {
   const objectUrlsRef = useRef<string[]>([])
   const abortRef = useRef<AbortController | null>(null)
   const toastTimerRef = useRef<number | null>(null)
+  const loadingTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     AOS.init({ duration: 700, once: true, offset: 80 })
@@ -73,6 +74,9 @@ function App() {
     return () => {
       abortRef.current?.abort()
       revokeObjectUrls(objectUrlsRef.current)
+      if (loadingTimerRef.current) {
+        window.clearTimeout(loadingTimerRef.current)
+      }
     }
   }, [])
 
@@ -154,7 +158,12 @@ function App() {
       setToast({ type: 'error', message: message || 'Request failed. Try again.' })
       toastTimerRef.current = window.setTimeout(() => setToast(null), 4500)
     } finally {
-      setIsSubmitting(false)
+      if (loadingTimerRef.current) {
+        window.clearTimeout(loadingTimerRef.current)
+      }
+      loadingTimerRef.current = window.setTimeout(() => {
+        setIsSubmitting(false)
+      }, 2000)
       abortRef.current = null
     }
   }
@@ -343,7 +352,7 @@ function App() {
 
               <button
                 type="submit"
-                className={`btn btn-primary w-full btn-liquid ${isSubmitting ? 'btn-liquid-loading' : ''}`}
+                className={`btn btn-primary rounded-full w-full btn-liquid ${isSubmitting ? 'btn-liquid-loading' : ''}`}
                 disabled={isSubmitting}
                 onClick={(e) => {
                   handleButtonRipple(e)
