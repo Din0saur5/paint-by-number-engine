@@ -381,11 +381,11 @@ function App() {
                 <div className="flex items-center justify-between gap-2 text-sm text-success">
                   <div className="flex items-center gap-2">
                     <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
-                    <span>Generated via /generate/. Assets below are ready.</span>
+                    <span>Assets below are ready.</span>
                   </div>
                   <span className="badge badge-ghost text-xs text-slate-600">
                     Palette: {paletteSummary.total} colors{' '}
-                    {paletteSummary.first ? `(${paletteSummary.first}…${paletteSummary.last})` : ''}
+                    
                   </span>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-3">
@@ -564,15 +564,31 @@ function App() {
             <p className="badge badge-outline">Stack</p>
             <h3 className="text-2xl font-semibold">How it works</h3>
             <p className="text-slate-600">
-              Upload a photo, pick your options, generate, and download. Everything runs in the browser with a call to
+              Upload a photo, pick your options, generate, and download. Everything runs on the browser with a call to
               the paint-by-number engine.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { title: 'Upload ready', desc: 'Drag/drop + file picker with validation.', icon: CloudArrowUpIcon },
-                { title: '/generate/ live', desc: 'FormData integration and error handling.', icon: ServerStackIcon },
-                { title: 'Downloads live', desc: 'Outline, preview, palette legend downloads + print helper.', icon: ArrowDownTrayIcon },
-                { title: 'Polish queued', desc: 'Animations, swatches, print view refinements coming next.', icon: Cog6ToothIcon },
+                {
+                  title: 'Resize & prep',
+                  desc: 'We read your image, normalize orientation, and resize it to fit print bounds.',
+                  icon: CloudArrowUpIcon,
+                },
+                {
+                  title: 'Pick your palette',
+                  desc: 'K-means condenses the photo into 3–16 colors and locks in consistent hex/RGB values.',
+                  icon: ServerStackIcon,
+                },
+                {
+                  title: 'Label & outline',
+                  desc: 'Regions are segmented, tiny areas are merged, and numbers are assigned for a clean outline.',
+                  icon: ArrowDownTrayIcon,
+                },
+                {
+                  title: 'Render kit',
+                  desc: 'We produce the outline PNG, painted preview, palette legend PDF, and swatches for download.',
+                  icon: Cog6ToothIcon,
+                },
               ].map(({ title, desc, icon: Icon }) => (
                 <div key={title} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                   <div className="flex items-center gap-3">

@@ -5,6 +5,7 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from PIL import Image
 
 from app.core.config import settings
 from app.services.image_pipeline.pipeline import render_paint_by_numbers
@@ -55,8 +56,21 @@ async def generate_image(
     if len(contents) > MAX_FILE_BYTES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
 
+    # Normalize incoming images (JPEG/PNG) to PNG to handle edge cases consistently
+    try:
+        input_image = Image.open(BytesIO(contents))
+    except Exception as exc:  # pragma: no cover - PIL raises many subclasses
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image file") from exc
+
+    if input_image.mode not in ("RGB", "RGBA"):
+        input_image = input_image.convert("RGB")
+
+    normalized_buffer = BytesIO()
+    input_image.save(normalized_buffer, format="PNG")
+    normalized_buffer.seek(0)
+
     final_image, preview_image, palette, _ = render_paint_by_numbers(
-        BytesIO(contents),
+        normalized_buffer,
         num_colors=num_colors,
         max_width=max_width,
         min_region_size=settings.min_region_size,
