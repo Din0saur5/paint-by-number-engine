@@ -7,10 +7,11 @@ def create_app() -> FastAPI:
     """Application factory so tests can instantiate the API easily."""
     app = FastAPI(title="Paint-By-Number Engine")
 
+    # Note: wildcard origins require allow_credentials=False per CORS spec.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # or ["*"] for testing
-        allow_credentials=True,
+        allow_origins=["*"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
         max_age=600,
