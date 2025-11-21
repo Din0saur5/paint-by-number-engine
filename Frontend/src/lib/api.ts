@@ -26,6 +26,7 @@ export type GenerateRequest = {
   file: File
   numColors: number
   maxWidth: number
+  minRegionSize: number
   signal?: AbortSignal
 }
 
@@ -39,12 +40,14 @@ export const generatePaintByNumber = async ({
   file,
   numColors,
   maxWidth,
+  minRegionSize,
   signal,
 }: GenerateRequest): Promise<GenerateResponse> => {
   const form = new FormData()
   form.append('file', file)
   form.append('num_colors', String(numColors))
   form.append('max_width', String(maxWidth))
+  form.append('min_region_size', String(minRegionSize))
 
   const response = await fetch(`${apiBaseUrl}/generate/`, {
     method: 'POST',

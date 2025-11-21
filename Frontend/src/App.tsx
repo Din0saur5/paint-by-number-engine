@@ -16,11 +16,14 @@ import { appName } from './lib/config'
 import {
   ACCEPTED_TYPES,
   DEFAULT_COLORS,
+  DEFAULT_REGION_SIZE,
   DEFAULT_WIDTH,
   MAX_COLORS,
+  MAX_REGION_SIZE,
   MAX_UPLOAD_BYTES,
   MAX_WIDTH,
   MIN_COLORS,
+  MIN_REGION_SIZE,
   MIN_WIDTH,
 } from './lib/constants'
 import { revokeObjectUrls } from './lib/blobs'
@@ -49,6 +52,8 @@ function App() {
   const [file, setFile] = useState<File | null>(null)
   const [numColors, setNumColors] = useState<number>(DEFAULT_COLORS)
   const [maxWidth, setMaxWidth] = useState<number>(DEFAULT_WIDTH)
+  const [minRegionSize, setMinRegionSize] = useState<number>(DEFAULT_REGION_SIZE)
+  const [compareValue, setCompareValue] = useState<number>(50)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<ResultState | null>(null)
   const [activeTab, setActiveTab] = useState<'outline' | 'preview' | 'palette' | 'legend'>('outline')
@@ -117,7 +122,7 @@ function App() {
       toastTimerRef.current = window.setTimeout(() => setToast(null), 4000)
       return
     }
-    const formIssue = validateForm(numColors, maxWidth)
+    const formIssue = validateForm(numColors, maxWidth, minRegionSize)
     if (formIssue) {
       setToast({ type: 'error', message: formIssue.message })
       toastTimerRef.current = window.setTimeout(() => setToast(null), 4000)
@@ -144,6 +149,7 @@ function App() {
         file: file as File,
         numColors,
         maxWidth,
+        minRegionSize,
         signal: controller.signal,
       })
       const urls = buildObjectUrls(payload)
@@ -254,6 +260,55 @@ function App() {
                 </div>
               ))}
             </div>
+
+            <section aria-label="Before and after comparison" className="mt-6">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-slate-200 bg-slate-900/5 shadow-card">
+                <img
+                  src="/test-image2_paint_by_numbers.png"
+                  alt="Paint-by-number outline reference"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div
+                  className="absolute inset-0 overflow-hidden"
+                  style={{ clipPath: `inset(0 calc(100% - ${compareValue}%) 0 0)` }}
+                  aria-hidden="true"
+                >
+                  <img
+                    src="/test-image2.png"
+                    alt="Original upload preview"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+
+                <div className="absolute left-2 bottom-2 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+                  Before
+                </div>
+                <div className="absolute right-2 bottom-2 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+                  After
+                </div>
+
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={compareValue}
+                  onChange={(e) => setCompareValue(Number(e.target.value))}
+                  className="comparison-range"
+                  aria-label="Move to compare before and after"
+                />
+                <div
+                  className="comparison-slider"
+                  style={{ left: `${compareValue}%` }}
+                  aria-hidden="true"
+                >
+                  <span className="comparison-thumb">
+                    <span className="sr-only">Slider handle</span>
+                    ⇆
+                  </span>
+                </div>
+              </div>
+            </section>
+
           </div>
 
           <div className="space-y-4" data-aos="fade-left">
@@ -312,8 +367,9 @@ function App() {
                 </div>
               )}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+              <div className='flex flex-col'>
+                <div className='flex flex-row justify-between mb-4'>
+               <label className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-2">
                   <div className="flex items-center justify-between text-sm text-slate-700">
                     <span className="font-semibold text-slate-900">Number of colors</span>
                     <span className="badge badge-ghost text-xs">
@@ -331,7 +387,9 @@ function App() {
                   <p className="text-xs text-slate-500">Default {DEFAULT_COLORS}</p>
                 </label>
 
-                <label className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+               
+                <div>
+                <label className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-2">
                   <div className="flex items-center justify-between text-sm text-slate-700">
                     <span className="font-semibold text-slate-900">Max width (px)</span>
                     <span className="badge badge-ghost text-xs">
@@ -348,6 +406,35 @@ function App() {
                   />
                   <p className="text-xs text-slate-500">Default {DEFAULT_WIDTH}</p>
                 </label>
+                </div>
+                </div>
+                <div className='flex'>
+                 <label className="flex flex-col w-full gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex items-center justify-between text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Minimum region size (px)</span>
+                    <span className="badge badge-ghost text-xs">
+                      {MIN_REGION_SIZE}–{MAX_REGION_SIZE}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={MIN_REGION_SIZE}
+                    max={MAX_REGION_SIZE}
+                    step={10}
+                    value={minRegionSize}
+                    onChange={(e) => setMinRegionSize(Number(e.target.value))}
+                    className="range  [--range-thumb:blue] text-gray-900  [--range-fill:0]"
+                  />
+                  <div className="flex items-center justify-between text-xs text-slate-600">
+                    <span>Detail</span>
+                    <span className="font-semibold text-slate-900">{minRegionSize}px</span>
+                    <span>Simplify</span>
+                  </div>
+                  
+                </label>
+                </div>
+                
+
               </div>
 
               <button
@@ -364,7 +451,7 @@ function App() {
               >
                 {isSubmitting ? (
                   <>
-                    <span className="loading loading-spinner" aria-hidden="true" />
+                    <span className="loading loading-dots loading-xs" aria-hidden="true" />
                     Loading…
                   </>
                 ) : (
@@ -375,9 +462,15 @@ function App() {
                 You’ll get an outline, painted preview, palette, and legend PDF—ready to download or print.
               </p>
             </form>
-
+            </div>
+</section>
             {result && (
-              <div className="space-y-5 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-inner">
+                <section
+          id="stack"
+          className="grid gap-6 rounded-3xl bg-white/90 p-8 shadow-card "
+          data-aos="fade-up"
+        >
+              <div className="space-y-5 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-inner lg:w-full">
                 <div className="flex items-center justify-between gap-2 text-sm text-success">
                   <div className="flex items-center gap-2">
                     <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
@@ -388,7 +481,7 @@ function App() {
                     
                   </span>
                 </div>
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div className="grid gap-4 ">
                   <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
                     <p className="text-xs uppercase tracking-wide text-slate-500">Result</p>
                     <h4 className="text-lg font-semibold text-slate-900">Outline & Preview</h4>
@@ -429,14 +522,14 @@ function App() {
                             <a
                               href={result.outlineUrl}
                               download={result.payload.image.filename}
-                              className="btn btn-sm btn-primary"
+                              className="btn btn-sm text-white btn-primary"
                             >
-                              <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />
+                              <ArrowDownTrayIcon className="h-4 w-4 text-white" aria-hidden="true" />
                               Download outline
                             </a>
                             <button
                               type="button"
-                              className="btn btn-sm btn-ghost"
+                              className="btn btn-sm btn-ghost "
                               onClick={() => openPrintWindow(result.outlineUrl, 'Paint-By-Number Outline')}
                             >
                               <PrinterIcon className="h-4 w-4" aria-hidden="true" />
@@ -447,7 +540,7 @@ function App() {
                           <a
                             href={result.previewUrl}
                             download={result.payload.preview.filename}
-                            className="btn btn-sm btn-secondary"
+                            className="btn btn-sm btn-secondary text-white"
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />
                             Download preview
@@ -518,50 +611,19 @@ function App() {
                   </div>
                 </div>
               </div>
+              </section>
             )}
           </div>
-{/* 
-          <div className="space-y-4 rounded-2xl bg-slate-50 p-6 shadow-inner">
-            <p className="text-sm font-semibold text-slate-800">Backend guardrails</p>
-            <ul className="space-y-2 text-sm text-slate-700">
-              <li className="flex items-start gap-2">
-                <div className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                PNG or JPEG only; max size {formatBytes(MAX_UPLOAD_BYTES)}.
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                num_colors between {MIN_COLORS} and {MAX_COLORS} (default {DEFAULT_COLORS}).
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                max_width between {MIN_WIDTH}px and {MAX_WIDTH}px (default {DEFAULT_WIDTH}px).
-              </li>
-            </ul>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
-              <p className="font-semibold text-slate-900">What you get</p>
-              <ul className="mt-2 space-y-1 text-slate-700">
-                <li>• Printable outline PNG</li>
-                <li>• Painted preview PNG</li>
-                <li>• Palette legend PDF</li>
-                <li>• Color swatches with hex codes</li>
-              </ul>
-            </div>
-            <div className="rounded-xl border border-dashed border-primary/40 bg-white p-4 text-xs text-slate-600">
-              <p className="font-semibold text-slate-900">Next</p>
-              <p className="mt-1">
-                Final polish: animations, accessibility pass, and print-view refinements.
-              </p>
-            </div>
-          </div> */}
-        </section>
+            
+      
 
         <section
           id="stack"
-          className="grid gap-6 rounded-3xl bg-white/90 p-8 shadow-card lg:grid-cols-[1.1fr_0.9fr]"
+          className="grid gap-6 rounded-3xl bg-white/90 p-8 shadow-card lg:grid-cols-[1.1fr_0.9fr] mb-24 mx-[5vw] "
           data-aos="fade-up"
         >
           <div className="space-y-4">
-            <p className="badge badge-outline">Stack</p>
+          
             <h3 className="text-2xl font-semibold">How it works</h3>
             <p className="text-slate-600">
               Upload a photo, pick your options, generate, and download. Everything runs on the browser with a call to
@@ -609,11 +671,20 @@ function App() {
               <li>Higher color count captures more detail; lower is easier to paint.</li>
               <li>Keep file size under 15 MB; PNG/JPEG only.</li>
               <li>Print the outline and legend together for an easy setup.</li>
+              <li>Smaller minimum region values keep fine areas (more numbers); larger values merge tiny regions for easier painting.</li>
             </ul>
           </div>
+
         </section>
+
+         
+         
+
+        
+
       </div>
-    </div>
+   
+    
   )
 }
 

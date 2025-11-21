@@ -29,6 +29,8 @@ MIN_COLORS = settings.min_colors
 MAX_COLORS = settings.max_colors
 MIN_WIDTH = settings.min_width
 MAX_WIDTH = settings.max_width
+MIN_REGION_SIZE = 50
+MAX_REGION_SIZE = 5000
 
 
 @router.post("/", summary="Generate a paint-by-numbers PNG with palette legend")
@@ -36,6 +38,7 @@ async def generate_image(
     file: UploadFile = File(...),
     num_colors: int = Form(settings.default_num_colors),
     max_width: int = Form(settings.default_max_width),
+    min_region_size: int = Form(settings.min_region_size),
 ):
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
@@ -48,6 +51,11 @@ async def generate_image(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"max_width must be between {MIN_WIDTH} and {MAX_WIDTH}",
+        )
+    if min_region_size < MIN_REGION_SIZE or min_region_size > MAX_REGION_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"min_region_size must be between {MIN_REGION_SIZE} and {MAX_REGION_SIZE}",
         )
 
     contents = await file.read(MAX_FILE_BYTES + 1)
@@ -73,7 +81,7 @@ async def generate_image(
         normalized_buffer,
         num_colors=num_colors,
         max_width=max_width,
-        min_region_size=settings.min_region_size,
+        min_region_size=min_region_size,
     )
     palette_metadata = build_palette_metadata(palette)
 

@@ -7,3 +7,7 @@ export const MAX_WIDTH = 4000
 export const DEFAULT_WIDTH = 2550
 
 export const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/jpg']
+
+export const MIN_REGION_SIZE = 50
+export const MAX_REGION_SIZE = 500
+export const DEFAULT_REGION_SIZE = 300
