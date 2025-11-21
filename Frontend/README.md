@@ -1,11 +1,12 @@
 # Paint-By-Number UI
 
-React + Vite + TypeScript UI that fronts the FastAPI paint-by-number engine. Tailwind, DaisyUI, and AOS are wired for styling and motion. Everything lives under `Frontend/`.
+React + Vite + TypeScript UI that fronts the FastAPI paint-by-number engine. Tailwind, DaisyUI, and AOS power styling/motion. Everything lives under `Frontend/`.
 
-Current state (PR2):
+Current state (PR4):
 - Upload workspace with drag/drop + file picker
-- Client-side validation mirroring the backend (PNG/JPEG, 15 MB, colors 3–16, width 400–4000)
-- AOS/Tailwind/DaisyUI theme initialized; API wiring lands in PR3
+- Client-side validation mirrors backend (PNG/JPEG, 15 MB, colors 3–16, width 400–4000)
+- Form posts to `/generate/` with `FormData`; base64 responses become Blob URLs for outline, preview, palette legend
+- Results UI with tabs/cards, outline print helper, downloads for outline/preview/PDF, palette swatches from the API response
 
 ## Stack
 - React 19 + Vite + TypeScript
@@ -48,4 +49,4 @@ Current state (PR2):
   - `max_width`: integer (defaults to backend value)
   - Response: base64 outline PNG, painted preview PNG, palette metadata, palette legend PDF.
 
-We’ll convert the base64 payloads to Blob URLs for previews, downloads, and printing in subsequent PRs.
+Responses are converted to Blob URLs for previews, downloads, and printing in the UI.

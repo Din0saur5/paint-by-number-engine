@@ -1,15 +1,18 @@
 import type React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownTrayIcon,
   CheckCircleIcon,
   CloudArrowUpIcon,
   Cog6ToothIcon,
+  DocumentArrowDownIcon,
+  PrinterIcon,
   ServerStackIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import AOS from 'aos'
-import { apiBaseUrl, appName } from './lib/config'
+import { buildObjectUrls, generatePaintByNumber, type GenerateResponse } from './lib/api'
+import { appName } from './lib/config'
 import {
   ACCEPTED_TYPES,
   DEFAULT_COLORS,
@@ -20,7 +23,16 @@ import {
   MIN_COLORS,
   MIN_WIDTH,
 } from './lib/constants'
-import { validateFile, validateForm, type ValidationIssue } from './lib/validation'
+import { revokeObjectUrls } from './lib/blobs'
+import { openPrintWindow } from './lib/print'
+import { validateFile, validateForm } from './lib/validation'
+
+type ResultState = {
+  payload: GenerateResponse
+  outlineUrl: string
+  previewUrl: string
+  legendUrl: string
+}
 
 const formatBytes = (bytes: number) => {
   return bytes >= 1024 * 1024
@@ -28,24 +40,50 @@ const formatBytes = (bytes: number) => {
     : `${(bytes / 1024).toFixed(0)} KB`
 }
 
+const formatDimensions = (asset: { width?: number; height?: number }) => {
+  if (!asset.width || !asset.height) return '—'
+  return `${asset.width} × ${asset.height}px`
+}
+
 function App() {
   const [file, setFile] = useState<File | null>(null)
   const [numColors, setNumColors] = useState<number>(DEFAULT_COLORS)
   const [maxWidth, setMaxWidth] = useState<number>(DEFAULT_WIDTH)
-  const [issue, setIssue] = useState<ValidationIssue | null>(null)
-  const [validated, setValidated] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [result, setResult] = useState<ResultState | null>(null)
+  const [activeTab, setActiveTab] = useState<'outline' | 'preview' | 'palette' | 'legend'>('outline')
+  const [toast, setToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const objectUrlsRef = useRef<string[]>([])
+  const abortRef = useRef<AbortController | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     AOS.init({ duration: 700, once: true, offset: 80 })
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current)
+      }
+    }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+      revokeObjectUrls(objectUrlsRef.current)
+    }
+  }, [])
+
+  const cleanupObjectUrls = () => {
+    revokeObjectUrls(objectUrlsRef.current)
+    objectUrlsRef.current = []
+  }
 
   const trySetFile = (incoming: File | null) => {
     const fileIssue = validateFile(incoming)
-    setIssue(fileIssue)
     if (!fileIssue && incoming) {
       setFile(incoming)
-      setValidated(false)
+      setResult(null)
     } else {
       setFile(null)
     }
@@ -62,83 +100,136 @@ function App() {
     trySetFile(event.target.files?.[0] ?? null)
   }
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setValidated(false)
+    setResult(null)
+    setToast(null)
+
     const fileIssue = validateFile(file)
     if (fileIssue) {
-      setIssue(fileIssue)
+      setToast({ type: 'error', message: fileIssue.message })
+      toastTimerRef.current = window.setTimeout(() => setToast(null), 4000)
       return
     }
     const formIssue = validateForm(numColors, maxWidth)
     if (formIssue) {
-      setIssue(formIssue)
+      setToast({ type: 'error', message: formIssue.message })
+      toastTimerRef.current = window.setTimeout(() => setToast(null), 4000)
       return
     }
-    setIssue(null)
-    setValidated(true)
+
+    setIsSubmitting(true)
+    cleanupObjectUrls()
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    try {
+      const payload = await generatePaintByNumber({
+        file: file as File,
+        numColors,
+        maxWidth,
+        signal: controller.signal,
+      })
+      const urls = buildObjectUrls(payload)
+      objectUrlsRef.current = [urls.outlineUrl, urls.previewUrl, urls.legendUrl]
+      setResult({ payload, ...urls })
+      setActiveTab('outline')
+      setToast({ type: 'success', message: 'Your kit is ready. Scroll down to view and download.' })
+      toastTimerRef.current = window.setTimeout(() => setToast(null), 4000)
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      const message = err instanceof Error ? err.message : 'Request failed. Try again.'
+      setToast({ type: 'error', message: message || 'Request failed. Try again.' })
+      toastTimerRef.current = window.setTimeout(() => setToast(null), 4500)
+    } finally {
+      setIsSubmitting(false)
+      abortRef.current = null
+    }
   }
+
+  const handleButtonPointer = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+    event.currentTarget.style.setProperty('--mx', `${x}px`)
+    event.currentTarget.style.setProperty('--my', `${y}px`)
+  }
+
+  const handleButtonRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const button = event.currentTarget
+    const rect = button.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+    const ripple = document.createElement('span')
+    ripple.className = 'btn-ripple'
+    ripple.style.left = `${x}px`
+    ripple.style.top = `${y}px`
+    button.appendChild(ripple)
+    ripple.addEventListener('animationend', () => ripple.remove(), { once: true })
+  }
+
+  const paletteSummary = useMemo(() => {
+    const total = result?.payload.palette.length ?? 0
+    const first = result?.payload.palette[0]?.hex
+    const last = result?.payload.palette.at(-1)?.hex
+    return { total, first, last }
+  }, [result])
 
   return (
     <div className="min-h-screen bg-base-100">
-      <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12 lg:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-12 px-6 py-12 lg:px-8">
+        {toast && (
+          <div
+            className={`fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full px-4 py-2 text-sm shadow-lg ${
+              toast.type === 'error'
+                ? 'bg-error text-white shadow-error/40'
+                : 'bg-success text-white shadow-success/40'
+            }`}
+          >
+            {toast.message}
+          </div>
+        )}
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-card">
               <SparklesIcon className="h-6 w-6" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500">Paint-By-Number Engine</p>
+              <p className="text-sm font-medium text-slate-500">Upload, generate, download</p>
               <h1 className="text-xl font-semibold text-slate-900">{appName}</h1>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="rounded-full bg-white px-3 py-1 text-slate-600 shadow-sm">
-              API base: <span className="font-medium text-slate-800">{apiBaseUrl}</span>
-            </span>
-            <span className="rounded-full bg-primary text-primary-content px-3 py-1 shadow-card">
-              PR2 · Upload + validation ready
-            </span>
-          </div>
+          <span className="rounded-full bg-primary text-primary-content px-3 py-1 shadow-card">
+            Ready to generate
+          </span>
         </header>
 
-        <section className="grid gap-8 rounded-3xl bg-white/80 p-8 shadow-card backdrop-blur lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-6" data-aos="fade-up">
+        <section className="grid gap-8 rounded-3xl bg-white/90 p-8 shadow-card backdrop-blur lg:grid-cols-[1fr_0.95fr]">
+          <div className="space-y-4" data-aos="fade-up">
             <p className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
               <SparklesIcon className="h-4 w-4" aria-hidden="true" />
-              Modern UI track
+              Turn your photo into a kit
             </p>
-            <h2 className="text-4xl font-semibold leading-tight">
-              Upload, validate, and prep your paint-by-number run.
-            </h2>
+            <h2 className="text-4xl font-semibold leading-tight">Upload, get your outline and palette.</h2>
             <p className="text-lg text-slate-600">
-              Drag-and-drop, file picker, and guardrails mirror the FastAPI engine: PNG/JPEG only, 15&nbsp;MB max,
-              colors and resize width within the backend limits. Next PR wires the /generate/ call.
+              Drop a PNG or JPEG, choose how many colors you want, and we’ll return an outline, a painted preview, your
+              palette, and a printable legend PDF.
             </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <a
-                href="#upload"
-                className="btn btn-primary btn-lg no-underline shadow-lg shadow-primary/30"
-              >
-                Try the upload
-              </a>
-              <a
-                href="#stack"
-                className="btn btn-ghost btn-lg text-slate-700 hover:bg-slate-100 no-underline"
-              >
-                View stack
-              </a>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 ">
               {[
-                'Vite + React + TS + Tailwind + DaisyUI + AOS are wired',
-                'Env-driven API base URL (VITE_API_BASE_URL)',
-                'Client-side validation matches backend limits',
-                'UI ready for /generate/ integration (PR3)',
+                'PNG/JPEG up to 15 MB',
+                '3–16 colors, resize up to 4000px',
+                'Downloads: outline, preview, legend PDF',
+                'Print-friendly outline built-in',
               ].map((item) => (
                 <div
                   key={item}
-                  className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3"
+                  className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 shadow-inner px-4 py-3"
                 >
                   <div className="mt-1 h-2 w-2 rounded-full bg-primary" />
                   <p className="text-sm font-medium text-slate-700">{item}</p>
@@ -146,76 +237,10 @@ function App() {
               ))}
             </div>
           </div>
-          <div
-            className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-primary/10 via-white to-secondary/10 p-6 shadow-inner"
-            data-aos="fade-left"
-          >
-            <div className="absolute inset-x-10 top-10 h-52 rounded-full bg-white/70 blur-3xl" />
-            <div className="relative space-y-4 text-sm text-slate-700">
-              <div className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 shadow">
-                <div className="flex items-center gap-3">
-                  <CloudArrowUpIcon className="h-5 w-5 text-primary" aria-hidden="true" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Upload panel</p>
-                    <p className="text-xs text-slate-500">Drag + drop, type/size guards</p>
-                  </div>
-                </div>
-                <span className="badge badge-primary badge-outline">Live</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 shadow">
-                <div className="flex items-center gap-3">
-                  <ServerStackIcon className="h-5 w-5 text-slate-700" aria-hidden="true" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">/generate/ wiring</p>
-                    <p className="text-xs text-slate-500">FormData → FastAPI</p>
-                  </div>
-                </div>
-                <span className="badge badge-outline border-slate-200 text-slate-700">PR3</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 shadow">
-                <div className="flex items-center gap-3">
-                  <ArrowDownTrayIcon className="h-5 w-5 text-orange-500" aria-hidden="true" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Outline & preview</p>
-                    <p className="text-xs text-slate-500">Downloads + print</p>
-                  </div>
-                </div>
-                <span className="badge badge-outline border-orange-300 bg-orange-50 text-orange-600">
-                  PR4
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 shadow">
-                <div className="flex items-center gap-3">
-                  <Cog6ToothIcon className="h-5 w-5 text-secondary" aria-hidden="true" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">UX polish</p>
-                    <p className="text-xs text-slate-500">AOS & microinteractions</p>
-                  </div>
-                </div>
-                <span className="badge badge-secondary badge-outline">PR5</span>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <section
-          id="upload"
-          className="grid gap-6 rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-card lg:grid-cols-[1.05fr_0.95fr]"
-          data-aos="fade-up"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="badge badge-primary badge-outline">PR2</span>
-              <p className="text-sm font-medium text-slate-600">Upload + validation</p>
-            </div>
-            <h3 className="text-2xl font-semibold">Upload workspace</h3>
-            <p className="text-slate-600">
-              Drop a PNG or JPEG, tune the number of colors, and set a resize width. Validation matches the backend:
-              3–16 colors, 400–4000px width, and 15&nbsp;MB max uploads. Submitting here validates locally; PR3 will
-              post to <code className="font-mono text-xs">/generate/</code>.
-            </p>
-
-            <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-4" data-aos="fade-left">
+            <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-card" onSubmit={handleSubmit}>
+              <h4 className="text-lg font-semibold text-slate-900">Upload & options</h4>
               <div
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
@@ -238,9 +263,7 @@ function App() {
                     .
                   </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  Accepted: PNG, JPEG · Max size {formatBytes(MAX_UPLOAD_BYTES)}
-                </p>
+                <p className="text-xs text-slate-500">PNG/JPEG · Max {formatBytes(MAX_UPLOAD_BYTES)}</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -263,7 +286,7 @@ function App() {
                     className="btn btn-ghost btn-sm"
                     onClick={() => {
                       setFile(null)
-                      setValidated(false)
+                      setResult(null)
                     }}
                   >
                     Clear
@@ -287,7 +310,7 @@ function App() {
                     onChange={(e) => setNumColors(Number(e.target.value))}
                     className="input input-bordered w-full"
                   />
-                  <p className="text-xs text-slate-500">Backend default: {DEFAULT_COLORS}</p>
+                  <p className="text-xs text-slate-500">Default {DEFAULT_COLORS}</p>
                 </label>
 
                 <label className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
@@ -305,50 +328,192 @@ function App() {
                     onChange={(e) => setMaxWidth(Number(e.target.value))}
                     className="input input-bordered w-full"
                   />
-                  <p className="text-xs text-slate-500">Backend default: {DEFAULT_WIDTH}</p>
+                  <p className="text-xs text-slate-500">Default {DEFAULT_WIDTH}</p>
                 </label>
               </div>
 
-              {issue && (
-                <div className="alert alert-error bg-error/10 text-sm text-error">
-                  <div className="flex-1">
-                    <p className="font-semibold">Validation failed</p>
-                    <p>{issue.message}</p>
+              {isSubmitting && (
+                <div className="alert bg-primary/10 text-sm text-primary">
+                  <div className="flex items-center gap-2">
+                    <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+                    Generating your kit…
                   </div>
                 </div>
               )}
 
-              {validated && (
-                <div className="alert alert-success bg-success/10 text-sm text-success">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
-                    Ready for /generate/
-                  </div>
-                  <div className="text-slate-700">
-                    <p className="text-sm">
-                      Looks good. Next step (PR3) will post this image and settings to the FastAPI engine.
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      File: {file?.name} · Colors: {numColors} · Max width: {maxWidth}px
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button type="submit" className="btn btn-primary">
-                  Validate input
-                </button>
-                <span className="text-sm text-slate-600">
-                  We will convert these values into <code className="font-mono text-xs">FormData</code> for the
-                  <code className="font-mono text-xs"> /generate/</code> endpoint in PR3.
-                </span>
-              </div>
+              <button
+                type="submit"
+                className="btn btn-primary w-full btn-fancy"
+                disabled={isSubmitting}
+                onMouseMove={handleButtonPointer}
+                onClick={(e) => {
+                  handleButtonRipple(e)
+                  if (isSubmitting) {
+                    e.preventDefault()
+                  }
+                }}
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="loading loading-spinner" aria-hidden="true" />
+                    Hang tight…
+                  </>
+                ) : (
+                  'Generate kit'
+                )}
+              </button>
+              <p className="text-xs text-slate-500 text-center">
+                You’ll get an outline, painted preview, palette, and legend PDF—ready to download or print.
+              </p>
             </form>
-          </div>
 
+            {result && (
+              <div className="space-y-5 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-inner">
+                <div className="flex items-center justify-between gap-2 text-sm text-success">
+                  <div className="flex items-center gap-2">
+                    <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
+                    <span>Generated via /generate/. Assets below are ready.</span>
+                  </div>
+                  <span className="badge badge-ghost text-xs text-slate-600">
+                    Palette: {paletteSummary.total} colors{' '}
+                    {paletteSummary.first ? `(${paletteSummary.first}…${paletteSummary.last})` : ''}
+                  </span>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Result</p>
+                    <h4 className="text-lg font-semibold text-slate-900">Outline & Preview</h4>
+                    <p className="text-sm text-slate-600">
+                      Toggle outline or painted preview, download files, or open a print-friendly outline view.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {(['outline', 'preview'] as const).map((tab) => (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setActiveTab(tab)}
+                          className={`btn btn-sm ${activeTab === tab ? 'btn-primary' : 'btn-ghost'}`}
+                        >
+                          {tab === 'outline' ? 'Outline' : 'Preview'}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                      <div className="flex items-center justify-between text-xs text-slate-600">
+                        <span>{activeTab === 'outline' ? 'Outline PNG' : 'Painted preview'}</span>
+                        <span>
+                          {activeTab === 'outline'
+                            ? formatDimensions(result.payload.image)
+                            : formatDimensions(result.payload.preview)}
+                        </span>
+                      </div>
+                      <div className="mt-3 overflow-hidden rounded-md bg-slate-50">
+                        <img
+                          src={activeTab === 'outline' ? result.outlineUrl : result.previewUrl}
+                          alt={activeTab === 'outline' ? 'Generated outline' : 'Painted preview'}
+                          className="mx-auto max-h-72 w-full object-contain"
+                        />
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                        {activeTab === 'outline' ? (
+                          <>
+                            <a
+                              href={result.outlineUrl}
+                              download={result.payload.image.filename}
+                              className="btn btn-sm btn-primary"
+                            >
+                              <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />
+                              Download outline
+                            </a>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => openPrintWindow(result.outlineUrl, 'Paint-By-Number Outline')}
+                            >
+                              <PrinterIcon className="h-4 w-4" aria-hidden="true" />
+                              Print outline
+                            </button>
+                          </>
+                        ) : (
+                          <a
+                            href={result.previewUrl}
+                            download={result.payload.preview.filename}
+                            className="btn btn-sm btn-secondary"
+                          >
+                            <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />
+                            Download preview
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Palette</p>
+                    <h4 className="text-lg font-semibold text-slate-900">Colors & swatches</h4>
+                    <p className="text-sm text-slate-600">
+                      Numbered swatches from the engine. Match these with the legend PDF when printing.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {result.payload.palette.map((entry) => (
+                        <div
+                          key={entry.number}
+                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="badge badge-ghost text-xs font-semibold">#{entry.number}</span>
+                            <span className="font-mono text-xs">{entry.hex}</span>
+                          </div>
+                          <span
+                            className="h-6 w-6 rounded-md border border-slate-200"
+                            style={{ backgroundColor: entry.hex }}
+                            aria-label={`Color ${entry.number} ${entry.hex}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Palette legend</p>
+                    <h4 className="text-lg font-semibold text-slate-900">PDF download</h4>
+                    <p className="text-sm text-slate-600">
+                      Download or open the legend in-browser. Pair it with the outline for printing.
+                    </p>
+                    <dl className="mt-3 space-y-1 text-xs text-slate-600">
+                      <div className="flex justify-between">
+                        <dt>Filename</dt>
+                        <dd className="font-mono">{result.payload.legend.filename}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>Type</dt>
+                        <dd>{result.payload.legend.content_type}</dd>
+                      </div>
+                    </dl>
+                    <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                      <a
+                        href={result.legendUrl}
+                        download={result.payload.legend.filename}
+                        className="btn btn-sm"
+                      >
+                        <DocumentArrowDownIcon className="h-4 w-4" aria-hidden="true" />
+                        Download PDF
+                      </a>
+                      <a
+                        href={result.legendUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-sm btn-ghost"
+                      >
+                        Open in new tab
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+{/* 
           <div className="space-y-4 rounded-2xl bg-slate-50 p-6 shadow-inner">
-            <p className="text-sm font-semibold text-slate-800">Backend guardrails (mirrored here)</p>
+            <p className="text-sm font-semibold text-slate-800">Backend guardrails</p>
             <ul className="space-y-2 text-sm text-slate-700">
               <li className="flex items-start gap-2">
                 <div className="mt-1 h-2 w-2 rounded-full bg-primary" />
@@ -364,25 +529,21 @@ function App() {
               </li>
             </ul>
             <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
-              <p className="font-semibold text-slate-900">Preview: request payload</p>
-              <p className="mt-2 font-mono text-[11px] leading-relaxed text-slate-700">
-                POST /generate/ (multipart/form-data)<br />
-                • file: &lt;binary&gt;<br />
-                • num_colors: {numColors}<br />
-                • max_width: {maxWidth}
-              </p>
-              <p className="mt-2 text-slate-600">
-                Response includes outline PNG, painted preview, palette metadata, and legend PDF (handled in PR3–PR4).
-              </p>
+              <p className="font-semibold text-slate-900">What you get</p>
+              <ul className="mt-2 space-y-1 text-slate-700">
+                <li>• Printable outline PNG</li>
+                <li>• Painted preview PNG</li>
+                <li>• Palette legend PDF</li>
+                <li>• Color swatches with hex codes</li>
+              </ul>
             </div>
             <div className="rounded-xl border border-dashed border-primary/40 bg-white p-4 text-xs text-slate-600">
               <p className="font-semibold text-slate-900">Next</p>
               <p className="mt-1">
-                Wire <code className="font-mono text-xs">fetch</code> with <code className="font-mono text-xs">FormData</code>,
-                stream base64 responses to Blob URLs, and render outline/preview downloads.
+                Final polish: animations, accessibility pass, and print-view refinements.
               </p>
             </div>
-          </div>
+          </div> */}
         </section>
 
         <section
@@ -392,17 +553,17 @@ function App() {
         >
           <div className="space-y-4">
             <p className="badge badge-outline">Stack</p>
-            <h3 className="text-2xl font-semibold">Ready for feature work</h3>
+            <h3 className="text-2xl font-semibold">How it works</h3>
             <p className="text-slate-600">
-              Tailwind, DaisyUI, and AOS are installed and configured. Use{' '}
-              <span className="font-mono">npm run dev</span> in <span className="font-mono">Frontend/</span> to start the UI.
+              Upload a photo, pick your options, generate, and download. Everything runs in the browser with a call to
+              the paint-by-number engine.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
                 { title: 'Upload ready', desc: 'Drag/drop + file picker with validation.', icon: CloudArrowUpIcon },
-                { title: '/generate/ next', desc: 'FormData integration planned for PR3.', icon: ServerStackIcon },
-                { title: 'Downloads coming', desc: 'Outline, preview, palette legend in PR4.', icon: ArrowDownTrayIcon },
-                { title: 'Polish queued', desc: 'Animations, swatches, print view in PR5.', icon: Cog6ToothIcon },
+                { title: '/generate/ live', desc: 'FormData integration and error handling.', icon: ServerStackIcon },
+                { title: 'Downloads live', desc: 'Outline, preview, palette legend downloads + print helper.', icon: ArrowDownTrayIcon },
+                { title: 'Polish queued', desc: 'Animations, swatches, print view refinements coming next.', icon: Cog6ToothIcon },
               ].map(({ title, desc, icon: Icon }) => (
                 <div key={title} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                   <div className="flex items-center gap-3">
@@ -417,21 +578,13 @@ function App() {
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-inner">
-            <p className="text-sm font-semibold text-slate-800">Developer quickstart</p>
-            <ol className="mt-3 space-y-2 text-sm text-slate-700">
-              <li>1) <code className="font-mono">cd Frontend && npm install</code></li>
-              <li>
-                2) Add <code className="font-mono">VITE_API_BASE_URL</code> to{' '}
-                <code className="font-mono">.env</code> (see example).
-              </li>
-              <li>3) <code className="font-mono">npm run dev</code> — try the upload flow.</li>
-            </ol>
-            <div className="mt-4 rounded-xl border border-dashed border-primary/40 bg-white p-4 text-xs text-slate-600">
-              <p className="font-semibold text-slate-900">Roadmap</p>
-              <p className="mt-1">
-                PR2: upload + validation (done), PR3: API wiring, PR4: results UI, PR5: polish + AOS choreography.
-              </p>
-            </div>
+            <p className="text-sm font-semibold text-slate-800">Quick tips</p> <hr/>
+            <ul className="mt-3 space-y-2 text-sm text-slate-700 ">
+              <li >Use clear, well-lit photos for best outlines.</li>
+              <li>Higher color count captures more detail; lower is easier to paint.</li>
+              <li>Keep file size under 15 MB; PNG/JPEG only.</li>
+              <li>Print the outline and legend together for an easy setup.</li>
+            </ul>
           </div>
         </section>
       </div>
