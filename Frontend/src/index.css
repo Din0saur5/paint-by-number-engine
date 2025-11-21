@@ -73,7 +73,7 @@
 }
 
 .btn-liquid:hover {
- 
+ color:#ffffff;
   box-shadow: 0 16px 40px rgba(37, 99, 235, 0.35);
   transform: translateY(-1px);
 }
