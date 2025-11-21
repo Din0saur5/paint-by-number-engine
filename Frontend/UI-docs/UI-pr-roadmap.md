@@ -35,3 +35,39 @@ Target: React/Vite/Tailwind/DaisyUI/AOS app in `Frontend/` that uploads an image
 ## Notes
 - Keep PRs tight and reviewable; attach before/after screenshots for results UI changes.
 - Do not commit large binaries; use sample `test-image.png` in repo root for demos.
+
+## PR-Button - MAking the button really cool:
+- ok so I want a rounded-xl button 
+- I like the way the background colors and the fancy hover part but I want to inverse the colors we use. 
+- on click. Iwant to add in this "empty circle ripple" instead of the ripple we have now. use this as reference:
+const buttons = document.querySelectorAll(".ripple");
+
+buttons.forEach((button) => {
+  button.addEventListener("click", function (e) {
+    const yInside = e.clientY - e.target.offsetTop;
+
+    const circle = document.createElement("span");
+    circle.classList.add("circle");
+    circle.style.top = yInside + "px";
+    circle.style.left = xInside + "px";
+
+    this.appendChild(circle);
+
+    setTimeout(() => circle.remove(), 500);
+  });
+});
+
+- then instead of the loading from before let it say loading but I want to run this animation on the button like a filling liquid:
+
+.liquid {
+  background: linear-gradient(#646cff 0 0) no-repeat calc(200% - var(--p, 0%))
+    100% / 200% var(--p, 0.2em);
+  transition: 0.3s var(--t, 0s),
+    background-position 0.3s calc(0.3s - var(--t, 0s));
+}
+
+.liquid:hover {
+  --p: 100%;
+  --t: 0.3s;
+  color: #fff;
+}

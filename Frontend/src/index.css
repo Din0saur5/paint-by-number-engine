@@ -35,52 +35,156 @@
   }
 }
 
-.btn-fancy {
+.btn-liquid {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background: linear-gradient(120deg, #1d4ed8 0%, #2563eb 40%, #38bdf8 100%);
-  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
+  border-radius: 0.9rem;
+  background: linear-gradient(270deg, #ffffff, #6ed1ff);
+  color: #2563eb;
+  border: 1px solid #2563eb;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  transition: box-shadow 200ms ease, color 200ms ease, transform 150ms ease;
 }
 
-.btn-fancy::after {
+.btn-liquid::before {
   content: '';
   position: absolute;
-  inset: -20%;
-  background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.25), transparent 40%);
+  inset: 0;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb, #38bdf8);
+  transform: translateY(110%);
+  transition: transform 0.35s ease;
+  clip-path: polygon(
+    0 28%,
+    16% 24%,
+    32% 26%,
+    48% 22%,
+    64% 26%,
+    80% 22%,
+    100% 25%,
+    100% 100%,
+    0 100%
+  );
+  z-index: -1;
+}
+
+  .btn-liquid:hover::before {
+  transform: translateY(0);
+}
+
+.btn-liquid:hover {
+ 
+  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-liquid::after {
+  content: '';
+  position: absolute;
+  inset: 0%;
+  background: radial-gradient(
+    circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.35),
+    transparent 42%
+  );
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity 360ms ease;
   pointer-events: none;
 }
 
-.btn-fancy:hover::after {
+.btn-liquid:hover::after {
   opacity: 1;
 }
 
-.btn-fancy:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.4);
+.btn-liquid-loading {
+  color: #fff;
 }
 
-.btn-ripple {
+.btn-liquid-loading::before {
+  animation: fill-sweep 1.2s ease-in-out , wave-top 1.6s ease-in-out infinite;
+  transform: translateY(0);
+}
+
+.btn-liquid:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-ripple-outline {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  background: rgba(255, 255, 255, 0.5);
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentColor;
   border-radius: 9999px;
-  transform: translate(-50%, -50%);
-  animation: fancy-ripple 650ms ease-out;
+  background: transparent;
+  transform: translate(-50%, -50%) scale(0.4);
+  animation: ripple-outline 650ms ease-out;
   pointer-events: none;
   z-index: 1;
 }
 
-@keyframes fancy-ripple {
+@keyframes ripple-outline {
   from {
-    opacity: 0.28;
-    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0.4);
   }
   to {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(16);
+    transform: translate(-50%, -50%) scale(10);
+  }
+}
+
+@keyframes fill-sweep {
+  0% {
+    transform: translateY(100%);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes wave-top {
+  0% {
+    clip-path: polygon(
+      0 30%,
+      16% 26%,
+      32% 28%,
+      48% 24%,
+      64% 28%,
+      80% 24%,
+      100% 27%,
+      100% 100%,
+      0 100%
+    );
+  }
+  50% {
+    clip-path: polygon(
+      0 26%,
+      16% 30%,
+      32% 24%,
+      48% 30%,
+      64% 26%,
+      80% 31%,
+      100% 24%,
+      100% 100%,
+      0 100%
+    );
+  }
+  100% {
+    clip-path: polygon(
+      0 30%,
+      16% 26%,
+      32% 28%,
+      48% 24%,
+      64% 28%,
+      80% 24%,
+      100% 27%,
+      100% 100%,
+      0 100%
+    );
   }
 }

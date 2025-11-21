@@ -52,7 +52,9 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<ResultState | null>(null)
   const [activeTab, setActiveTab] = useState<'outline' | 'preview' | 'palette' | 'legend'>('outline')
-  const [toast, setToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null)
+  const [toast, setToast] = useState<{ type: 'error' | 'success' | 'info'; message: string } | null>(
+    null,
+  )
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const objectUrlsRef = useRef<string[]>([])
   const abortRef = useRef<AbortController | null>(null)
@@ -124,6 +126,11 @@ function App() {
     const controller = new AbortController()
     abortRef.current = controller
 
+    setToast({ type: 'info', message: 'Generating your kit…' })
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current)
     }
@@ -152,25 +159,25 @@ function App() {
     }
   }
 
-  const handleButtonPointer = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
-    event.currentTarget.style.setProperty('--mx', `${x}px`)
-    event.currentTarget.style.setProperty('--my', `${y}px`)
-  }
-
   const handleButtonRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
     const button = event.currentTarget
     const rect = button.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
     const ripple = document.createElement('span')
-    ripple.className = 'btn-ripple'
+    ripple.className = 'btn-ripple-outline'
     ripple.style.left = `${x}px`
     ripple.style.top = `${y}px`
     button.appendChild(ripple)
     ripple.addEventListener('animationend', () => ripple.remove(), { once: true })
+  }
+
+  const handleButtonPointer = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+    event.currentTarget.style.setProperty('--mx', `${x}px`)
+    event.currentTarget.style.setProperty('--my', `${y}px`)
   }
 
   const paletteSummary = useMemo(() => {
@@ -188,7 +195,9 @@ function App() {
             className={`fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full px-4 py-2 text-sm shadow-lg ${
               toast.type === 'error'
                 ? 'bg-error text-white shadow-error/40'
-                : 'bg-success text-white shadow-success/40'
+                : toast.type === 'success'
+                  ? 'bg-success text-white shadow-success/40'
+                  : 'bg-primary text-white shadow-primary/30'
             }`}
           >
             {toast.message}
@@ -332,31 +341,22 @@ function App() {
                 </label>
               </div>
 
-              {isSubmitting && (
-                <div className="alert bg-primary/10 text-sm text-primary">
-                  <div className="flex items-center gap-2">
-                    <span className="loading loading-spinner loading-sm" aria-hidden="true" />
-                    Generating your kit…
-                  </div>
-                </div>
-              )}
-
               <button
                 type="submit"
-                className="btn btn-primary w-full btn-fancy"
+                className={`btn btn-primary w-full btn-liquid ${isSubmitting ? 'btn-liquid-loading' : ''}`}
                 disabled={isSubmitting}
-                onMouseMove={handleButtonPointer}
                 onClick={(e) => {
                   handleButtonRipple(e)
                   if (isSubmitting) {
                     e.preventDefault()
                   }
                 }}
+                onMouseMove={handleButtonPointer}
               >
                 {isSubmitting ? (
                   <>
                     <span className="loading loading-spinner" aria-hidden="true" />
-                    Hang tight…
+                    Loading…
                   </>
                 ) : (
                   'Generate kit'
