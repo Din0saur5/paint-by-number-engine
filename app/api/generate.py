@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import resource
 from io import BytesIO
 from pathlib import Path
 
@@ -96,6 +97,8 @@ async def generate_image(
     preview_image.save(preview_buffer, format="PNG")
     preview_b64 = base64.b64encode(preview_buffer.getvalue()).decode("ascii")
 
+    mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+
     return {
         "image": {
             "filename": _sanitize_filename(file.filename),
@@ -116,5 +119,8 @@ async def generate_image(
             "filename": f"{Path(file.filename or 'output').stem}_palette_legend.pdf",
             "content_type": "application/pdf",
             "data": legend_b64,
+        },
+        "meta": {
+            "memory_mb": round(mem_mb, 2),
         },
     }
